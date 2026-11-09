@@ -192,7 +192,7 @@ footer a{color:var(--accent)}
 <script>
 (function(){
 "use strict";
-const RES = "https://data.cityofchicago.org/resource/";
+const RES = location.hostname.endsWith("chicagodrivesafe.com") || location.hostname.endsWith(".workers.dev") ? "/api/" : "https://data.cityofchicago.org/resource/";
 const W = "crash_date >= '2018-01-01T00:00:00'";
 const MON = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const $ = id => document.getElementById(id);

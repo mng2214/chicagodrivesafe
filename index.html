@@ -376,7 +376,8 @@ a.clear{text-decoration:none}
 <script>
 document.addEventListener("DOMContentLoaded", function(){
 "use strict";
-const API = "https://data.cityofchicago.org/resource/85ca-t3if.json";
+const DATA = location.hostname.endsWith("chicagodrivesafe.com") || location.hostname.endsWith(".workers.dev") ? "/api/" : "https://data.cityofchicago.org/resource/";
+const API = DATA + "85ca-t3if.json";
 const CITY_KM2 = 606.1, AREA_R = 500, AREA_KM2 = Math.PI * 0.25;
 const $ = id => document.getElementById(id);
 const track = (name, params) => { try { if (window.gtag) window.gtag("event", name, params || {}); } catch (e) {} };
@@ -484,7 +485,8 @@ function showError(html){ const e = $("err"); e.innerHTML = html; e.hidden = !ht
 async function load(){
   const id = ++S.req;
   showError(""); showLoading(true, "Loading crashes for the last " + S.days + " days…");
-  const since = new Date(Date.now() - S.days*864e5).toISOString().slice(0,19);
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone:"America/Chicago" }).format(new Date());
+  const since = new Date(Date.parse(today + "T00:00:00Z") - S.days*864e5).toISOString().slice(0,10) + "T00:00:00";
   const sel = "crash_date,crash_hour,crash_day_of_week,latitude,longitude,injuries_total,injuries_fatal,prim_contributory_cause,first_crash_type,street_no,street_direction,street_name,weather_condition";
   const q = "$select=" + encodeURIComponent(sel) +
             "&$where=" + encodeURIComponent("crash_date > '" + since + "' AND latitude IS NOT NULL") +
@@ -682,7 +684,7 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { pa
 
 // ---------- year by year ----------
 async function loadYears(){
-  const R = "https://data.cityofchicago.org/resource/", W = "crash_date >= '2018-01-01T00:00:00'";
+  const R = DATA, W = "crash_date >= '2018-01-01T00:00:00'";
   const q = (id, o) => R + id + ".json?" + Object.entries(o).map(([k,v]) => k + "=" + encodeURIComponent(v)).join("&");
   try {
     const [c, p] = await Promise.all([

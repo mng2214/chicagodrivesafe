@@ -253,7 +253,7 @@ footer a{color:var(--accent)}
 <script>
 document.addEventListener("DOMContentLoaded", function(){
 "use strict";
-const RES = "https://data.cityofchicago.org/resource/", W = "crash_date >= '2018-01-01T00:00:00'";
+const RES = location.hostname.endsWith("chicagodrivesafe.com") || location.hostname.endsWith(".workers.dev") ? "/api/" : "https://data.cityofchicago.org/resource/", W = "crash_date >= '2018-01-01T00:00:00'";
 const $ = id => document.getElementById(id);
 const track = (name, params) => { try { if (window.gtag) window.gtag("event", name, params || {}); } catch (e) {} };
 const fmt = n => Number(n).toLocaleString("en-US");
