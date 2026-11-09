@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Chicago Car Crash Map: Daily Traffic Accident Data | Chicago Crash Atlas</title>
 <meta name="description" content="Interactive map of car crashes reported by Chicago police, updated daily. See injuries, deaths, the streets with the most crashes, and crash times near any address.">
+<!-- Google tag (GTM-KTRFPG9G) -->
+<script async src="https://www.googletagmanager.com/gtm.js?id=GTM-KTRFPG9G"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag("js",new Date());</script>
 <meta name="robots" content="index, follow, max-image-preview:large">
 <meta name="theme-color" content="#F3F6F8">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Crect width='36' height='36' fill='%23fff'/%3E%3Crect y='6' width='36' height='6' fill='%2341B6E6'/%3E%3Crect y='24' width='36' height='6' fill='%2341B6E6'/%3E%3Cpath d='M18 12.5l1.6 3.1 3.4-.6-1.8 3 1.8 3-3.4-.6L18 23.5l-1.6-3.1-3.4.6 1.8-3-1.8-3 3.4.6z' fill='%23E4002B'/%3E%3C/svg%3E">
@@ -376,6 +379,7 @@ document.addEventListener("DOMContentLoaded", function(){
 const API = "https://data.cityofchicago.org/resource/85ca-t3if.json";
 const CITY_KM2 = 606.1, AREA_R = 500, AREA_KM2 = Math.PI * 0.25;
 const $ = id => document.getElementById(id);
+const track = (name, params) => { try { if (window.gtag) window.gtag("event", name, params || {}); } catch (e) {} };
 const fmt = n => Number(n).toLocaleString("en-US");
 const hh = h => String(h).padStart(2, "0");
 const plural = (n, one, few, many) => Math.abs(n) === 1 ? one : many;
@@ -631,22 +635,23 @@ function renderArea(){
 }
 map.on("click", e => {
   if (Date.now() - layerClickAt < 300) return;
-  S.area = e.latlng; renderArea(); $("hint").hidden = true;
+  S.area = e.latlng; renderArea(); $("hint").hidden = true; track("area_check");
 });
 $("areaClose").addEventListener("click", () => { S.area = null; renderArea(); });
 
 // ---------- controls ----------
 function press(group, btn){ group.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b === btn))); }
-$("daysSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; press(e.currentTarget, b); S.days = +b.dataset.d; load(); });
-for (const id of ["sInj","sFat"]) $(id).addEventListener("click", e => { const s = e.currentTarget.dataset.s; S.sev = S.sev === s ? "all" : s;
+$("daysSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; press(e.currentTarget, b); S.days = +b.dataset.d; track("select_period", { days: S.days }); load(); });
+for (const id of ["sInj","sFat"]) $(id).addEventListener("click", e => { const s = e.currentTarget.dataset.s; S.sev = S.sev === s ? "all" : s; track("filter_severity", { severity: S.sev });
   $("sInj").setAttribute("aria-pressed", String(S.sev === "inj")); $("sFat").setAttribute("aria-pressed", String(S.sev === "fat")); apply(); });
-$("viewSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; press(e.currentTarget, b); S.view = b.dataset.v; renderMap(); });
+$("viewSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; press(e.currentTarget, b); S.view = b.dataset.v; track("map_view", { view: S.view }); renderMap(); });
 $("hours").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; stopPlay(); const h = +b.dataset.h; S.hour = S.hour === h ? -1 : h; apply(); });
 $("week").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; stopPlay(); const dw = +b.dataset.d, h = +b.dataset.h;
   if (S.dow === dw && S.hour === h){ S.dow = -1; S.hour = -1; } else { S.dow = dw; S.hour = h; } apply(); });
 $("hourClear").addEventListener("click", () => { stopPlay(); S.hour = -1; apply(); });
 $("dowClear").addEventListener("click", () => { S.dow = -1; apply(); });
 $("streets").addEventListener("click", e => { const b = e.target.closest("button[data-street]"); if (!b) return;
+  track("street_click", { street: b.dataset.street });
   const pts_ = S.f.filter(d => d.street === b.dataset.street).map(d => [d.lat, d.lon]);
   if (pts_.length){ map.fitBounds(L.latLngBounds(pts_).pad(0.15), { maxZoom:15 }); document.querySelector(".mapwrap").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block:"center" }); } });
 
@@ -657,7 +662,7 @@ function stopPlay(){ if (timer){ clearInterval(timer); timer = null; } $("play")
 $("play").innerHTML = PLAY;
 $("play").addEventListener("click", () => {
   if (timer){ stopPlay(); return; }
-  $("play").innerHTML = PAUSE; $("play").setAttribute("aria-label","Stop");
+  track("play_day"); $("play").innerHTML = PAUSE; $("play").setAttribute("aria-label","Stop");
   S.hour = S.hour < 0 ? 0 : (S.hour + 1) % 24; apply();
   timer = setInterval(() => { S.hour = (S.hour + 1) % 24; apply(); }, 800);
 });

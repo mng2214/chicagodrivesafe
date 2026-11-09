@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Chicago Traffic Deaths: Fatal Crashes Since 2018 | Chicago Crash Atlas</title>
 <meta name="description" content="Fatal traffic crashes in Chicago police records since 2018, on one map: date, location, who was killed, crash type and cause. Filter pedestrians, cyclists, hit-and-runs.">
+<!-- Google tag (GTM-KTRFPG9G) -->
+<script async src="https://www.googletagmanager.com/gtm.js?id=GTM-KTRFPG9G"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag("js",new Date());</script>
 <meta name="robots" content="index, follow, max-image-preview:large">
 <meta name="theme-color" content="#F3F6F8">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Crect width='36' height='36' fill='%23fff'/%3E%3Crect y='6' width='36' height='6' fill='%2341B6E6'/%3E%3Crect y='24' width='36' height='6' fill='%2341B6E6'/%3E%3Cpath d='M18 12.5l1.6 3.1 3.4-.6-1.8 3 1.8 3-3.4-.6L18 23.5l-1.6-3.1-3.4.6 1.8-3-1.8-3 3.4.6z' fill='%23E4002B'/%3E%3C/svg%3E">
@@ -252,6 +255,7 @@ document.addEventListener("DOMContentLoaded", function(){
 "use strict";
 const RES = "https://data.cityofchicago.org/resource/", W = "crash_date >= '2018-01-01T00:00:00'";
 const $ = id => document.getElementById(id);
+const track = (name, params) => { try { if (window.gtag) window.gtag("event", name, params || {}); } catch (e) {} };
 const fmt = n => Number(n).toLocaleString("en-US");
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const tc = s => s.toLowerCase().replace(/(^|[\s\-\/(])([a-z])/g, (m, p, c) => p + c.toUpperCase());
@@ -462,12 +466,12 @@ function syncButtons(){
   $("fWho").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.w === S.who)));
   $("fHr").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.h === S.hr)));
 }
-$("fYear").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; S.year = b.dataset.y; syncButtons(); apply(); });
-$("fWho").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; S.who = b.dataset.w; syncButtons(); apply(); });
-$("fHr").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; S.hr = b.dataset.h; syncButtons(); apply(); });
-let st; $("fStreet").addEventListener("input", e => { clearTimeout(st); st = setTimeout(() => { S.street = e.target.value.trim().toLowerCase(); apply(); }, 200); });
+$("fYear").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; S.year = b.dataset.y; syncButtons(); track("filter_year", { year: S.year }); apply(); });
+$("fWho").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; S.who = b.dataset.w; syncButtons(); track("filter_victim", { who: S.who }); apply(); });
+$("fHr").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; S.hr = b.dataset.h; syncButtons(); track("filter_hit_and_run", { value: S.hr }); apply(); });
+let st, st2; $("fStreet").addEventListener("input", e => { clearTimeout(st); st = setTimeout(() => { S.street = e.target.value.trim().toLowerCase(); apply(); }, 200); clearTimeout(st2); st2 = setTimeout(() => { if (S.street) track("search_street", { search_term: S.street }); }, 1500); });
 $("more").addEventListener("click", () => { S.shown += 40; renderList(true); });
-$("list").addEventListener("click", e => { const b = e.target.closest(".addr"); if (b) focusCrash(b.dataset.id, true); });
+$("list").addEventListener("click", e => { const b = e.target.closest(".addr"); if (b){ track("crash_open", { source: "list" }); focusCrash(b.dataset.id, true); } });
 let hot = null;
 $("list").addEventListener("pointerover", e => { const li = e.target.closest(".entry"); const id = li && li.querySelector(".addr") && li.querySelector(".addr").dataset.id;
   if (hot && hot !== id){ const m = markers.get(hot); if (m && m._icon){ m._icon.classList.remove("hl"); m.setZIndexOffset(0); } }
