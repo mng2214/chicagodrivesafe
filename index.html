@@ -1,0 +1,703 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chicago Car Crash Map: Daily Traffic Accident Data | Chicago Crash Atlas</title>
+<meta name="description" content="Interactive map of every car crash on Chicago streets, updated daily. See injuries, deaths, dangerous streets, and crash times near any address in Chicago.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="theme-color" content="#F3F6F8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Crect width='36' height='36' fill='%23fff'/%3E%3Crect y='6' width='36' height='6' fill='%2341B6E6'/%3E%3Crect y='24' width='36' height='6' fill='%2341B6E6'/%3E%3Cpath d='M18 12.5l1.6 3.1 3.4-.6-1.8 3 1.8 3-3.4-.6L18 23.5l-1.6-3.1-3.4.6 1.8-3-1.8-3 3.4.6z' fill='%23E4002B'/%3E%3C/svg%3E">
+<!-- After deploy: replace YOUR-DOMAIN, then uncomment canonical and og:url -->
+<!-- <link rel="canonical" href="https://YOUR-DOMAIN/"> -->
+<!-- <meta property="og:url" content="https://YOUR-DOMAIN/"> -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Chicago Crash Atlas">
+<meta property="og:title" content="Chicago Car Crash Map: Daily Traffic Accident Data">
+<meta property="og:description" content="Interactive map of every car crash on Chicago streets, updated daily. See injuries, deaths, dangerous streets, and crash times near any address in Chicago.">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Chicago Car Crash Map: Daily Traffic Accident Data">
+<meta name="twitter:description" content="Interactive map of every car crash on Chicago streets, updated daily. See injuries, deaths, dangerous streets, and crash times near any address in Chicago.">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Dataset", "name": "Chicago traffic crashes", "description": "Traffic crashes on City of Chicago streets reported by the Chicago Police Department, including injuries, fatalities, location, time, crash type and primary contributing cause. Updated daily.", "creator": {"@type": "GovernmentOrganization", "name": "City of Chicago", "url": "https://data.cityofchicago.org"}, "isBasedOn": "https://data.cityofchicago.org/d/85ca-t3if", "spatialCoverage": {"@type": "Place", "name": "Chicago, Illinois", "geo": {"@type": "GeoShape", "box": "41.64 -87.94 42.02 -87.52"}}, "temporalCoverage": "2018-01-01/..", "keywords": ["Chicago car crashes", "Chicago traffic accidents", "Chicago crash map", "Vision Zero Chicago", "traffic deaths"], "distribution": [{"@type": "DataDownload", "encodingFormat": "application/json", "contentUrl": "https://data.cityofchicago.org/resource/85ca-t3if.json"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebSite", "name": "Chicago Crash Atlas", "description": "Maps and statistics of traffic crashes in Chicago, from City of Chicago open data."}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=Public+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="preconnect" href="https://tile.openstreetmap.org">
+<script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script defer src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<style>
+/* Layout: map-first atlas. Big map with a floating headline on the left, a filter + time rail on the right, rankings below. Chicago flag blue + red star carry the identity. */
+:root{
+  --bg:#F3F6F8; --surface:#FFFFFF; --surface-2:#F0F4F7; --ink:#13212E; --muted:#596A79; --line:#D5DEE6;
+  --accent:#1B87C0; --flagblue:#41B6E6; --pd:#5BB6E0; --inj:#DB7400; --fat:#E4002B;
+  --cell0:#E2EAF0; --glass:rgba(255,255,255,.88); --shadow:0 6px 20px rgba(19,33,46,.10);
+  --tile-filter:saturate(.4) contrast(.96) brightness(1.03);
+  --f-display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
+  --f-body:"Public Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --ease:cubic-bezier(.23,1,.32,1);
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--f-body);-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+
+.shell{max-width:1500px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.top{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 20px;padding-block:14px 16px}
+.brand{display:flex;align-items:center;gap:10px;margin:0;font:800 34px/1 var(--f-display);letter-spacing:.01em}
+.brand svg{width:48px;height:32px;flex:none;display:block;outline:1px solid var(--line);background:#fff}
+.src{color:var(--muted);font-size:13px}
+
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 390px;gap:16px;align-items:start}
+@media (max-width:1020px){.layout{grid-template-columns:minmax(0,1fr)}}
+
+.mapwrap{position:relative;height:clamp(480px,74vh,860px);border-radius:16px;overflow:hidden;border:1px solid var(--line);background:var(--surface-2)}
+#map{position:absolute;inset:0;background:var(--surface-2)}
+.leaflet-tile-pane{filter:var(--tile-filter)}
+.overlay{position:absolute;z-index:500;background:var(--glass);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+.hero{top:14px;left:14px;padding:16px 18px 14px;max-width:min(360px,calc(100% - 28px))}
+.big{font:800 clamp(52px,7vw,84px)/.86 var(--f-display);letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.cap{margin-top:6px;font-weight:600;font-size:15px}
+.ctx{color:var(--muted);font-size:13px;min-height:1.4em}
+.sevline{list-style:none;margin:12px 0 0;padding:12px 0 0;border-top:1px solid var(--line);display:grid;gap:5px;font-size:14px}
+.sevline li{display:flex;align-items:center;gap:8px}
+.sevline b{font-variant-numeric:tabular-nums;min-width:3.2em}
+.mk{width:12px;height:12px;flex:none;border-radius:50%}
+.mk.pd{background:var(--pd)} .mk.inj{background:var(--inj)}
+.mk.star{border-radius:0;background:none}
+.mk.star svg{width:14px;height:14px;display:block;margin:-1px}
+.viewsw{top:14px;right:14px;padding:4px}
+.hint{bottom:14px;left:14px;padding:8px 12px;font-size:13px;color:var(--muted);max-width:calc(100% - 90px)}
+.loading{top:50%;left:50%;transform:translate(-50%,-50%);padding:14px 18px;display:flex;align-items:center;gap:12px;font-weight:600}
+.loading[hidden]{display:none}
+.spin{width:18px;height:18px;border-radius:50%;border:2.5px solid var(--line);border-top-color:var(--accent);animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.err{margin-top:12px;padding:12px 14px;border-radius:12px;border:1px solid var(--fat);color:var(--ink);background:var(--surface)}
+.err[hidden]{display:none}
+.err b{color:var(--fat)}
+
+.rail{display:flex;flex-direction:column;gap:16px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px;min-width:0}
+.panel h2{margin:0 0 4px;font:600 24px/1.1 var(--f-display);letter-spacing:.01em}
+.panel .sub{margin:0 0 14px;color:var(--muted);font-size:13px}
+.ph{display:flex;align-items:center;justify-content:space-between;gap:10px}
+
+.seg{display:flex;gap:3px;padding:3px;border-radius:11px;background:var(--surface-2);border:1px solid var(--line)}
+.seg button{flex:1;border:0;background:transparent;border-radius:8px;padding:8px 10px;font-weight:600;font-size:14px;color:var(--muted);transition:transform 140ms var(--ease),background-color 160ms ease,color 160ms ease;white-space:nowrap}
+.seg button:active{transform:scale(.97)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.field+.field{margin-top:16px}
+.flabel{display:block;font-size:13px;color:var(--muted);margin-bottom:6px;font-weight:500}
+.sev{display:grid;gap:6px}
+.sev button{display:grid;grid-template-columns:16px 1fr auto;align-items:center;gap:10px;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 12px;font-size:14px;transition:transform 140ms var(--ease),border-color 160ms ease,background-color 160ms ease}
+.sev button:active{transform:scale(.98)}
+.sev button[aria-pressed="true"]{border-color:var(--ink);background:var(--surface-2);font-weight:600}
+.sev .n{color:var(--muted);font-variant-numeric:tabular-nums;font-weight:500}
+
+.play{width:36px;height:36px;border-radius:50%;border:0;background:var(--accent);color:#fff;display:grid;place-items:center;transition:transform 140ms var(--ease);flex:none}
+.play:active{transform:scale(.94)}
+.play svg{width:14px;height:14px}
+.hourlbl{font-weight:600;font-variant-numeric:tabular-nums;font-size:14px}
+.clear{border:0;background:none;color:var(--accent);font-weight:600;font-size:13px;padding:2px 0}
+.clear[hidden]{display:none}
+.hours{display:grid;grid-template-columns:repeat(24,minmax(0,1fr));gap:2px;height:150px;align-items:end;margin-top:12px}
+.hours button{height:100%;border:0;padding:0;background:transparent;display:flex;flex-direction:column-reverse;gap:2px;border-radius:4px 4px 0 0;transition:opacity 160ms ease}
+.hours .s{display:block;width:100%;border-radius:2px}
+.hours .s.inj{background:var(--inj)}
+.hours .s.pd{background:var(--pd);border-radius:4px 4px 2px 2px}
+.hours.sel button[aria-pressed="false"]{opacity:.32}
+.axis{display:grid;grid-template-columns:repeat(24,minmax(0,1fr));font-size:11px;color:var(--muted);margin-top:6px;font-variant-numeric:tabular-nums}
+.axis span{grid-column:span 6}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:10px;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend .mk{width:10px;height:10px;border-radius:3px}
+
+.week{display:grid;grid-template-columns:22px repeat(24,minmax(0,1fr));gap:2px;margin-top:4px}
+.week .dl{font-size:11px;color:var(--muted);align-self:center}
+.week button{aspect-ratio:1;border:0;padding:0;border-radius:3px;background:var(--cell0);transition:transform 120ms var(--ease)}
+.week button:active{transform:scale(.9)}
+.week button[aria-pressed="true"]{outline:2px solid var(--ink);outline-offset:1px}
+.ramp{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--muted)}
+.ramp i{height:8px;width:120px;border-radius:4px;background:linear-gradient(90deg,var(--cell0),var(--accent))}
+
+.area[hidden]{display:none}
+.area .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:10px 0 12px}
+.area .stats div{background:var(--surface-2);border-radius:10px;padding:10px}
+.area .stats b{display:block;font:800 30px/1 var(--f-display);font-variant-numeric:tabular-nums}
+.area .stats span{font-size:12px;color:var(--muted)}
+.area dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:14px}
+.area dt{color:var(--muted)}
+.area dd{margin:0;font-weight:600}
+.ratio{display:inline-block;margin-top:2px;font-weight:700}
+
+.lower{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:16px}
+@media (max-width:1020px){.lower{grid-template-columns:minmax(0,1fr)}}
+.bars{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.bars li>*{width:100%}
+.bar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;border:0;background:none;padding:0;text-align:left;font-size:14px}
+button.bar{border-radius:6px;transition:transform 140ms var(--ease)}
+button.bar:active{transform:scale(.99)}
+@media (hover:hover) and (pointer:fine){button.bar:hover .nm{color:var(--accent)}}
+.bar .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar .v{font-variant-numeric:tabular-nums;font-weight:600}
+.bar .v small{color:var(--muted);font-weight:500;margin-left:6px}
+.track{grid-column:1/-1;height:8px;border-radius:4px;background:var(--cell0);display:flex;gap:2px;overflow:hidden}
+.track i{display:block;height:100%}
+.track .pd{background:var(--pd)} .track .inj{background:var(--inj)} .track .one{background:var(--accent)}
+.note{margin:-8px 0 14px;font-size:13px;color:var(--muted)}
+.empty{color:var(--muted);font-size:14px}
+
+footer{margin-top:20px;padding-block:16px 28px;border-top:1px solid var(--line);color:var(--muted);font-size:12.5px;max-width:90ch}
+footer a{color:var(--accent)}
+
+.tip{position:fixed;z-index:2000;pointer-events:none;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:8px 10px;font-size:13px;line-height:1.4;opacity:0;transform:translateY(4px);transition:opacity 120ms ease,transform 120ms var(--ease);max-width:240px}
+.tip.on{opacity:1;transform:none}
+.tip b{font-variant-numeric:tabular-nums}
+
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.leaflet-popup-content{margin:14px 16px;font:14px/1.45 var(--f-body)}
+.leaflet-container a.leaflet-popup-close-button{color:var(--muted)}
+.leaflet-bar a{background:var(--surface);color:var(--ink);border-color:var(--line)}
+.leaflet-control-attribution{background:var(--glass)!important;color:var(--muted)}
+.leaflet-control-attribution a{color:var(--muted)}
+.pp-tag{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;margin-bottom:4px}
+.pp-addr{font:600 21px/1.1 var(--f-display);display:block}
+.pp-when{color:var(--muted);font-size:13px;display:block;margin-bottom:8px}
+.pp dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:3px 10px}
+.pp dt{color:var(--muted)} .pp dd{margin:0}
+.fstar{background:none;border:0}
+.fstar svg{filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))}
+
+
+/* ---- de-templated layer ---- */
+.top{padding-block:18px 6px;align-items:center}
+.brand{font-size:24px;gap:12px}
+.lede{padding-block:10px 22px;max-width:62rem}
+.headline{margin:0;font:800 clamp(30px,4.3vw,54px)/1.06 var(--f-display);letter-spacing:-.005em;text-wrap:balance}
+.headline .num{font-variant-numeric:tabular-nums}
+.periods{display:inline-flex;align-items:baseline;gap:.08em}
+.periods button,.sevtag{font:inherit;border:0;background:none;padding:0 .04em;color:inherit;letter-spacing:inherit}
+.periods button[aria-pressed="false"]{color:var(--muted);opacity:.55;text-decoration:underline dotted 2px;text-underline-offset:.16em}
+.periods button[aria-pressed="true"]{color:var(--ink)}
+.periods .sl{color:var(--line);font-weight:600}
+.sevtag{text-decoration:underline 4px;text-underline-offset:.14em;transition:background-color 160ms ease}
+.sevtag.inj{text-decoration-color:var(--inj)} .sevtag.fat{text-decoration-color:var(--fat)}
+.sevtag.inj[aria-pressed="true"]{background:color-mix(in oklab,var(--inj) 26%,transparent)}
+.sevtag.fat[aria-pressed="true"]{background:color-mix(in oklab,var(--fat) 22%,transparent)}
+@media (hover:hover) and (pointer:fine){.periods button[aria-pressed="false"]:hover{opacity:1}.sevtag:hover{background:color-mix(in oklab,var(--ink) 6%,transparent)}}
+.deck{margin:12px 0 0;color:var(--muted);font-size:16px;max-width:60ch}
+
+.mapwrap{border:0;outline:1px solid var(--line)}
+.viewsw{position:absolute;z-index:500;top:12px;right:12px;display:flex;background:var(--surface);outline:1px solid var(--line)}
+.viewsw button{border:0;background:none;padding:7px 12px;font-weight:600;font-size:13px;color:var(--muted)}
+.viewsw button[aria-pressed="true"]{color:var(--ink);box-shadow:inset 0 -3px 0 var(--accent)}
+.key{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:10px;font-size:13px;color:var(--muted)}
+.key span{display:inline-flex;align-items:center;gap:7px}
+.overlay{box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;background:var(--surface)}
+
+.rail{gap:0}
+.block{padding-block:20px;border-top:1px solid var(--line);min-width:0}
+.rail .block:first-child{padding-top:0;border-top:0}
+.rail .block.area:not([hidden])+.block{border-top:1px solid var(--line)}
+.block h2,.col h2{margin:0;font:600 22px/1.15 var(--f-display);letter-spacing:.01em}
+.block .sub{margin:4px 0 10px;color:var(--muted);font-size:13px}
+.area{background:var(--surface);padding:16px!important;outline:2px solid var(--ink);margin-bottom:20px;border-top:0!important}
+.hours{margin-top:10px}
+
+.lower{gap:36px;margin-top:28px;padding-top:24px;border-top:3px solid var(--ink)}
+.col{min-width:0}
+.col h2{margin-bottom:16px}
+.note{margin:-8px 0 14px}
+
+.signs{list-style:none;margin:0;padding:0;display:grid;gap:9px}
+.sign{display:flex;align-items:stretch;border:0;padding:0;background:none;width:100%;text-align:left}
+.blade{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:9.5rem;background:#0F6B3B;color:#fff;box-shadow:inset 0 0 0 2px #0F6B3B,inset 0 0 0 4px #fff;padding:7px 12px 6px;font:600 21px/1 var(--f-display);letter-spacing:.02em;white-space:nowrap;overflow:hidden;transition:transform 140ms var(--ease)}
+.blade .cnt{font:800 16px/1 var(--f-display);font-variant-numeric:tabular-nums;padding-left:10px;border-left:2px solid rgba(255,255,255,.75)}
+.sign .meta{align-self:center;margin-left:10px;font-size:12.5px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.sign:active .blade{transform:scale(.98)}
+@media (hover:hover) and (pointer:fine){.sign:hover .blade{background:#0B5A31}}
+.nav{display:flex;gap:22px}
+.nav a{color:var(--muted);text-decoration:none;font-weight:600;font-size:14px;padding:6px 0}
+.nav a[aria-current="page"]{color:var(--ink);box-shadow:inset 0 -3px 0 var(--accent)}
+@media (hover:hover) and (pointer:fine){.nav a:hover{color:var(--ink)}}
+a.clear{text-decoration:none}
+.ytab{width:100%;border-collapse:collapse;margin-top:10px;font-size:13.5px;font-variant-numeric:tabular-nums}
+.ytab th{font-size:11.5px;font-weight:600;color:var(--muted);text-align:right;padding:0 0 6px;border-bottom:1px solid var(--ink)}
+.ytab td{text-align:right;padding:5px 0;border-bottom:1px solid var(--line)}
+.ytab th:first-child,.ytab td:first-child{text-align:left}
+.ytab td.k{color:var(--fat);font-weight:700}
+.ytab tr.cur td{font-style:italic}
+.ynote{margin:8px 0 0;font-size:12px;color:var(--muted)}
+*,*::before,*::after,.leaflet-popup-content-wrapper,.leaflet-bar,.leaflet-bar a{border-radius:0!important}
+.mk:not(.star),.spin{border-radius:50%!important}
+.legend .mk{border-radius:0!important}
+.hours button{gap:1px}
+@media (prefers-reduced-motion:reduce){*{transition-duration:0ms!important}.spin{animation-duration:2s}}
+@media (max-width:560px){.hint{display:none}.hero{padding:12px 14px}.week{grid-template-columns:18px repeat(24,minmax(0,1fr));gap:1px}}
+
+/* ---- phone ---- */
+@media (max-width:640px){
+  .top{padding-block:12px 4px;gap:6px 16px}
+  .brand{font-size:21px!important;gap:10px}
+  .brand svg{width:39px!important;height:26px!important}
+  nav,.nav{gap:18px}
+  .lede{padding-block:6px 16px}
+  .headline{font-size:31px!important;line-height:1.08}
+  .deck{font-size:15px}
+}
+@media (max-width:640px){
+  .mapwrap{height:min(62vh,520px);min-height:360px}
+  .viewsw{top:8px;right:8px}
+  .viewsw button{padding:8px 11px}
+  .key{font-size:12.5px;gap:4px 14px}
+  .rail .block:first-child{padding-top:20px}
+  .hours{height:120px;gap:1px}
+  .lower{gap:28px;margin-top:20px}
+  .blade{font-size:18px;min-width:7.5rem;padding:6px 10px 5px}
+  .blade .cnt{font-size:14px}
+  .sign .meta{font-size:11.5px;margin-left:8px}
+  .area .stats b{font-size:26px}
+  .leaflet-control-attribution{font-size:9px}
+}
+.about{margin-top:36px;padding-top:24px;border-top:3px solid var(--ink)}
+.about h2{margin:0 0 16px;font:600 22px/1.15 var(--f-display)}
+.faq{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 40px;max-width:72rem}
+@media (max-width:760px){.faq{grid-template-columns:minmax(0,1fr)}}
+.faq h3{margin:0 0 4px;font-size:16px}
+.faq p{margin:0;color:var(--muted);max-width:62ch}
+.faq a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="top">
+    <div class="brand"><span id="brandStar"></span><span>Chicago Crash Atlas</span></div>
+    <nav class="nav" aria-label="Pages"><a href="/" aria-current="page">Map</a><a href="/years">Years</a><a href="/fatalities">Fatalities</a></nav>
+  </header>
+
+  <section class="lede" aria-live="polite">
+    <h1 class="headline"><span class="num" id="hTotal">Hundreds of</span> crashes on Chicago streets in the last <span class="periods" id="daysSeg" role="group" aria-label="Period"><button type="button" id="d7" data-d="7" aria-pressed="false">7</button><span class="sl" aria-hidden="true">/</span><button type="button" id="d30" data-d="30" aria-pressed="true">30</button><span class="sl" aria-hidden="true">/</span><button type="button" id="d90" data-d="90" aria-pressed="false">90</button></span> days. <button type="button" class="sevtag inj" id="sInj" data-s="inj" aria-pressed="false"><span class="num" id="hInj">many</span> with injuries</button>, <button type="button" class="sevtag fat" id="sFat" data-s="fat" aria-pressed="false"><span class="num" id="hFat">some</span> fatal</button>.</h1>
+    <p class="deck" id="hDeck">A live map of car crashes in Chicago, built from Chicago Police reports published on the city’s open data portal.</p>
+  </section>
+
+  <main class="layout">
+    <section aria-label="Crash map">
+      <div class="mapwrap">
+        <div id="map"></div>
+        <div class="viewsw" id="viewSeg" role="group" aria-label="Map view">
+          <button type="button" id="vPoints" data-v="points" aria-pressed="true">Points</button>
+          <button type="button" id="vHeat" data-v="heat" aria-pressed="false">Density</button>
+        </div>
+        <div class="overlay hint" id="hint">Click anywhere on the map to count crashes within 500 m</div>
+        <div class="overlay loading" id="loading"><span class="spin"></span><span id="loadingText">Loading data…</span></div>
+      </div>
+      <div class="key" aria-hidden="true">
+        <span><i class="mk pd"></i>No injuries</span>
+        <span><i class="mk inj"></i>Injuries</span>
+        <span><i class="mk star" id="kStarIcon"></i>Fatal</span>
+      </div>
+      <div class="err" id="err" role="alert" hidden></div>
+    </section>
+
+    <aside class="rail">
+      <div class="block area" id="area" hidden>
+        <div class="ph"><h2>Within 500 m</h2><button type="button" class="clear" id="areaClose">Clear</button></div>
+        <p class="sub" id="areaWhere">—</p>
+        <div class="stats">
+          <div><b id="aN">—</b><span>crashes</span></div>
+          <div><b id="aInj">—</b><span>injured</span></div>
+          <div><b id="aFat">—</b><span>killed</span></div>
+        </div>
+        <dl>
+          <dt>Density</dt><dd><span class="ratio" id="aRatio">—</span></dd>
+          <dt>Top cause</dt><dd id="aCause">—</dd>
+          <dt>Top type</dt><dd id="aType">—</dd>
+          <dt>Peak hour</dt><dd id="aHour">—</dd>
+        </dl>
+      </div>
+
+      <div class="block">
+        <div class="ph">
+          <h2>Hour by hour</h2>
+          <button type="button" class="play" id="play" aria-label="Play through the day"></button>
+        </div>
+        <div class="ph">
+          <span class="hourlbl" id="hourLbl">All hours</span>
+          <button type="button" class="clear" id="hourClear" hidden>Reset</button>
+        </div>
+        <div class="hours" id="hours" role="group" aria-label="Pick an hour"></div>
+        <div class="axis" aria-hidden="true"><span>midnight</span><span>6 am</span><span>noon</span><span>6 pm</span></div>
+      </div>
+
+      <div class="block">
+        <div class="ph"><h2>Year by year</h2><a class="clear" href="/years">Every month</a></div>
+        <table class="ytab">
+          <thead><tr><th>Year</th><th>Crashes</th><th>Pedestrians</th><th>Cyclists</th><th>Killed</th></tr></thead>
+          <tbody id="ytab"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+        </table>
+        <p class="ynote">Crashes that hurt someone. Pedestrians and cyclists count everyone killed or hurt. *Year so far.</p>
+      </div>
+
+      <div class="block">
+        <div class="ph"><h2>The week, hour by hour</h2><button type="button" class="clear" id="dowClear" hidden>Reset day</button></div>
+        <div class="week" id="week"></div>
+        <div class="ramp"><span>fewer</span><i></i><span>more crashes</span></div>
+      </div>
+    </aside>
+  </main>
+
+  <section class="lower">
+    <div class="col streetscol">
+      <h2>Streets with the most crashes</h2>
+      <ol class="signs" id="streets"></ol>
+    </div>
+    <div class="col">
+      <h2>What police say caused them</h2>
+      <p class="note" id="causeNote"></p>
+      <ol class="bars" id="causes"></ol>
+    </div>
+    <div class="col">
+      <h2>How they happened</h2>
+      <ol class="bars" id="types"></ol>
+    </div>
+  </section>
+  </footer>
+</div>
+<div class="tip" id="tip" role="tooltip"></div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+"use strict";
+const API = "https://data.cityofchicago.org/resource/85ca-t3if.json";
+const CITY_KM2 = 606.1, AREA_R = 500, AREA_KM2 = Math.PI * 0.25;
+const $ = id => document.getElementById(id);
+const fmt = n => Number(n).toLocaleString("en-US");
+const hh = h => String(h).padStart(2, "0");
+const plural = (n, one, few, many) => Math.abs(n) === 1 ? one : many;
+const tc = s => s.toLowerCase().replace(/(^|[\s\-\/(])([a-z])/g, (m, p, c) => p + c.toUpperCase());
+const sc = s => { s = s.toLowerCase(); return s.charAt(0).toUpperCase() + s.slice(1); };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+const DOW_ORDER = [2,3,4,5,6,7,1];
+const DOW_SHORT = {1:"Su",2:"Mo",3:"Tu",4:"We",5:"Th",6:"Fr",7:"Sa"};
+const DOW_LONG = {1:"Sunday",2:"Monday",3:"Tuesday",4:"Wednesday",5:"Thursday",6:"Friday",7:"Saturday"};
+const NO_CAUSE = new Set(["UNABLE TO DETERMINE","NOT APPLICABLE"]);
+const CAUSE_RU = {
+  "OPERATING VEHICLE IN ERRATIC, RECKLESS, CARELESS, NEGLIGENT OR AGGRESSIVE MANNER":"Reckless or aggressive driving",
+  "DISTRACTION - OTHER ELECTRONIC DEVICE (NAVIGATION DEVICE, DVD PLAYER, ETC.)":"Distracted by navigation or device",
+  "UNDER THE INFLUENCE OF ALCOHOL/DRUGS (USE WHEN ARREST IS EFFECTED)":"Under the influence (arrest made)",
+  "HAD BEEN DRINKING (USE WHEN ARREST IS NOT MADE)":"Had been drinking",
+  "VISION OBSCURED (SIGNS, TREE LIMBS, BUILDINGS, ETC.)":"Vision obscured",
+  "EVASIVE ACTION DUE TO ANIMAL, OBJECT, NONMOTORIST":"Evasive action",
+  "FAILING TO REDUCE SPEED TO AVOID CRASH":"Failed to reduce speed",
+  "DRIVING SKILLS/KNOWLEDGE/EXPERIENCE":"Driver inexperience",
+  "IMPROPER TURNING/NO SIGNAL":"Improper turn / no signal",
+  "IMPROPER OVERTAKING/PASSING":"Improper passing",
+  "FAILING TO YIELD RIGHT-OF-WAY":"Failed to yield"
+};
+const TYPE_RU = { "PARKED MOTOR VEHICLE":"Hit parked vehicle", "PEDALCYCLIST":"Cyclist", "OTHER NONCOLLISION":"Non-collision" };
+const ruCause = s => CAUSE_RU[s] || sc(s);
+const ruType = s => TYPE_RU[s] || sc(s);
+
+function starSVG(size, color){
+  const R = 10, r = 4.3, pts = [];
+  for (let i = 0; i < 12; i++){ const a = Math.PI/6*i - Math.PI/2, rad = i % 2 ? r : R; pts.push((12 + rad*Math.cos(a)).toFixed(2) + "," + (12 + rad*Math.sin(a)).toFixed(2)); }
+  return '<svg viewBox="0 0 24 24" width="'+size+'" height="'+size+'" aria-hidden="true"><polygon points="'+pts.join(" ")+'" fill="'+color+'"/></svg>';
+}
+function flagSVG(){
+  let st = "";
+  for (const x of [11.5, 22.5, 33.5, 44.5]){
+    const pts = [];
+    for (let i = 0; i < 12; i++){ const a = Math.PI/6*i - Math.PI/2, rad = i % 2 ? 1.9 : 4.4; pts.push((x + rad*Math.cos(a)).toFixed(2) + "," + (18 + rad*Math.sin(a)).toFixed(2)); }
+    st += '<polygon points="' + pts.join(" ") + '" fill="#E4002B"/>';
+  }
+  return '<svg viewBox="0 0 56 36" aria-label="Flag of Chicago" role="img"><rect width="56" height="36" fill="#fff"/><rect y="6" width="56" height="6" fill="#41B6E6"/><rect y="24" width="56" height="6" fill="#41B6E6"/>' + st + '</svg>';
+}
+function tok(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function paintStars(){
+  const red = tok("--fat");
+  $("brandStar").innerHTML = flagSVG();
+  $("kStarIcon").innerHTML = starSVG(14, red);
+}
+
+const S = { days:30, sev:"all", hour:-1, dow:-1, view:"points", rows:[], f:[], area:null, req:0 };
+
+// ---------- map ----------
+const map = L.map("map", { zoomControl:false, preferCanvas:true, minZoom:9, scrollWheelZoom:false }).setView([41.845, -87.68], 11);
+map.on("click focus", () => map.scrollWheelZoom.enable());
+map.on("mouseout blur", () => map.scrollWheelZoom.disable());
+L.control.zoom({ position:"bottomright" }).addTo(map);
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom:19, attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(map);
+const canvas = L.canvas({ padding:0.4 });
+const pts = L.featureGroup().addTo(map);
+const stars = L.featureGroup().addTo(map);
+let heat = null, areaCircle = null, layerClickAt = 0;
+
+function popupHTML(d){
+  const sev = d.fat > 0 ? ["var(--fat)","Fatal"] : d.inj > 0 ? ["var(--inj)","With injuries"] : ["var(--pd)","No injuries"];
+  const when = d.date && !isNaN(d.date) ? d.date.toLocaleString("en-US",{weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}) : "";
+  return '<div class="pp"><div class="pp-tag"><i class="mk" style="background:'+sev[0]+'"></i>'+sev[1]+'</div>'+
+    '<span class="pp-addr">'+esc(d.addr || "Address not listed")+'</span><span class="pp-when">'+esc(when)+'</span><dl>'+
+    '<dt>Type</dt><dd>'+esc(ruType(d.type))+'</dd>'+
+    '<dt>Cause</dt><dd>'+esc(NO_CAUSE.has(d.cause) ? "not determined" : ruCause(d.cause))+'</dd>'+
+    '<dt>Injured</dt><dd>'+d.inj+(d.fat ? ", killed: "+d.fat : "")+'</dd>'+
+    (d.weather ? '<dt>Weather</dt><dd>'+esc(tc(d.weather))+'</dd>' : "")+'</dl></div>';
+}
+function onLayerClick(e){ layerClickAt = Date.now(); const d = e.layer && e.layer.options.data; if (d) L.popup({maxWidth:300}).setLatLng(e.latlng).setContent(popupHTML(d)).openOn(map); }
+pts.on("click", onLayerClick); stars.on("click", onLayerClick);
+
+function renderMap(){
+  pts.clearLayers(); stars.clearLayers();
+  if (heat){ map.removeLayer(heat); heat = null; }
+  const f = S.f;
+  if (S.view === "heat"){
+    heat = L.heatLayer(f.map(d => [d.lat, d.lon, d.fat ? 1 : d.inj ? .6 : .35]), {
+      radius:15, blur:20, maxZoom:15, minOpacity:.25,
+      gradient:{0.2:"#1d5f8a",0.45:"#41B6E6",0.7:"#FFB347",0.9:"#FF5A36",1:"#E4002B"}
+    }).addTo(map);
+  } else {
+    const cPd = tok("--pd"), cInj = tok("--inj");
+    const pd = f.filter(d => !d.inj && !d.fat), inj = f.filter(d => d.inj && !d.fat);
+    const step = pd.length > 16000 ? Math.ceil(pd.length / 16000) : 1;
+    for (let i = 0; i < pd.length; i += step){ const d = pd[i];
+      L.circleMarker([d.lat,d.lon], { renderer:canvas, radius:2.8, stroke:false, fillColor:cPd, fillOpacity:.75, data:d }).addTo(pts); }
+    for (const d of inj){
+      L.circleMarker([d.lat,d.lon], { renderer:canvas, radius:3.4, color:tok("--surface"), weight:.6, fillColor:cInj, fillOpacity:.95, data:d }).addTo(pts); }
+  }
+  const icon = L.divIcon({ className:"fstar", html:starSVG(24, tok("--fat")), iconSize:[24,24], iconAnchor:[12,12] });
+  for (const d of f) if (d.fat) L.marker([d.lat,d.lon], { icon, data:d, keyboard:false, title:"Fatal crash" }).addTo(stars);
+}
+
+// ---------- data ----------
+function showLoading(on, text){ $("loading").hidden = !on; if (text) $("loadingText").textContent = text; }
+function showError(html){ const e = $("err"); e.innerHTML = html; e.hidden = !html; }
+
+async function load(){
+  const id = ++S.req;
+  showError(""); showLoading(true, "Loading crashes for the last " + S.days + " days…");
+  const since = new Date(Date.now() - S.days*864e5).toISOString().slice(0,19);
+  const sel = "crash_date,crash_hour,crash_day_of_week,latitude,longitude,injuries_total,injuries_fatal,prim_contributory_cause,first_crash_type,street_no,street_direction,street_name,weather_condition";
+  const q = "$select=" + encodeURIComponent(sel) +
+            "&$where=" + encodeURIComponent("crash_date > '" + since + "' AND latitude IS NOT NULL") +
+            "&$order=" + encodeURIComponent("crash_date DESC") + "&$limit=60000";
+  const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 90000);
+  try {
+    const r = await fetch(API + "?" + q, { signal:ctrl.signal });
+    if (!r.ok) throw new Error("portal returned " + r.status);
+    const raw = await r.json();
+    if (id !== S.req) return;
+    S.rows = raw.map(d => ({
+      lat:+d.latitude, lon:+d.longitude, date:new Date(d.crash_date),
+      hour: d.crash_hour != null ? +d.crash_hour : -1, dow: d.crash_day_of_week != null ? +d.crash_day_of_week : -1,
+      inj:+(d.injuries_total || 0), fat:+(d.injuries_fatal || 0),
+      cause:(d.prim_contributory_cause || "UNABLE TO DETERMINE").trim(), type:(d.first_crash_type || "OTHER OBJECT").trim(),
+      street: d.street_name ? tc(d.street_name.trim()) : "",
+      addr: [d.street_no, d.street_direction, d.street_name ? tc(d.street_name.trim()) : ""].filter(Boolean).join(" "),
+      weather: d.weather_condition && !/UNKNOWN|CLEAR/.test(d.weather_condition) ? d.weather_condition : ""
+    })).filter(d => isFinite(d.lat) && isFinite(d.lon) && d.lat > 41.6 && d.lat < 42.1 && d.lon < -87.5 && d.lon > -87.95);
+    apply();
+  } catch (e){
+    if (id !== S.req) return;
+    const msg = e.name === "AbortError" ? "The city portal did not respond within 90 seconds. Try again or pick 7 days."
+      : location.protocol === "file:" ? "The browser blocked the request because the page was opened as a file. Run <code>python3 -m http.server 8000</code> in this folder and open <code>http://localhost:8000/</code>."
+      : "Could not fetch data (" + esc(e.message) + "). Check your connection and ad blockers, then reload.";
+    showError("<b>Data did not load.</b> " + msg + ' <button type="button" class="clear" id="retry">Try again</button>');
+    const rb = $("retry"); if (rb) rb.onclick = load;
+  } finally {
+    clearTimeout(timer);
+    if (id === S.req) showLoading(false);
+  }
+}
+
+// ---------- filtering ----------
+const sevOk = d => S.sev === "inj" ? d.inj > 0 : S.sev === "fat" ? d.fat > 0 : true;
+const hourOk = d => S.hour < 0 || d.hour === S.hour;
+const dowOk = d => S.dow < 0 || d.dow === S.dow;
+
+function apply(){
+  S.f = S.rows.filter(d => sevOk(d) && hourOk(d) && dowOk(d));
+  renderHero(); renderMap(); renderHours(); renderWeek(); renderLists(); renderArea();
+}
+
+function contextLine(){
+  const parts = [];
+  if (S.dow > 0) parts.push(DOW_LONG[S.dow]);
+  if (S.hour >= 0) parts.push(hh(S.hour) + ":00–" + hh(S.hour) + ":59");
+  if (!parts.length) return "Whole city, every hour of the day";
+  return "Only " + parts.join(", ");
+}
+function renderHero(){
+  const base = S.rows.filter(d => hourOk(d) && dowOk(d));
+  $("hTotal").textContent = fmt(base.length);
+  $("hInj").textContent = fmt(base.filter(d => d.inj > 0).length);
+  $("hFat").textContent = fmt(base.filter(d => d.fat > 0).length);
+  const perDay = base.length / S.days;
+  let deck = contextLine() + ". About " + (perDay >= 10 ? fmt(Math.round(perDay)) : perDay.toFixed(1)) + " a day.";
+  if (S.sev === "inj") deck += " The map and charts now show injury crashes only.";
+  if (S.sev === "fat") deck += " The map and charts now show fatal crashes only.";
+  if (S.sev === "all") deck += " Tap the underlined numbers to narrow by severity.";
+  $("hDeck").textContent = deck;
+}
+
+// ---------- hours chart ----------
+function renderHours(){
+  const base = S.rows.filter(d => sevOk(d) && dowOk(d));
+  const tot = new Array(24).fill(0), inj = new Array(24).fill(0);
+  for (const d of base) if (d.hour >= 0 && d.hour < 24){ tot[d.hour]++; if (d.inj > 0) inj[d.hour]++; }
+  const max = Math.max(1, ...tot);
+  const box = $("hours"); box.classList.toggle("sel", S.hour >= 0);
+  box.innerHTML = tot.map((t, h) => {
+    const hi = inj[h] / max * 100, hp = (t - inj[h]) / max * 100;
+    const tip = "<b>" + hh(h) + ":00–" + hh(h) + ":59</b><br>" + fmt(t) + " " + plural(t,"crash","","crashes") + "<br>with injuries: " + fmt(inj[h]);
+    return '<button type="button" data-h="'+h+'" aria-pressed="'+(S.hour === h)+'" aria-label="'+hh(h)+':00, '+t+' crashes" data-tip="'+esc(tip)+'">' +
+      (inj[h] ? '<span class="s inj" style="height:'+hi.toFixed(2)+'%"></span>' : "") +
+      (t - inj[h] ? '<span class="s pd" style="height:'+hp.toFixed(2)+'%"></span>' : "") + "</button>";
+  }).join("");
+  $("hourLbl").textContent = S.hour < 0 ? "All hours" : hh(S.hour) + ":00–" + hh(S.hour) + ":59";
+  $("hourClear").hidden = S.hour < 0;
+}
+
+// ---------- week x hour grid ----------
+function renderWeek(){
+  const base = S.rows.filter(sevOk);
+  const m = {}; let max = 1;
+  for (const d of base) if (d.dow > 0 && d.hour >= 0){ const k = d.dow + "-" + d.hour; m[k] = (m[k] || 0) + 1; if (m[k] > max) max = m[k]; }
+  let html = "";
+  for (const dw of DOW_ORDER){
+    html += '<span class="dl">' + DOW_SHORT[dw] + "</span>";
+    for (let h = 0; h < 24; h++){
+      const v = m[dw + "-" + h] || 0, t = v ? .1 + .9*Math.pow(v / max, .65) : 0;
+      const on = S.dow === dw && S.hour === h;
+      const tip = "<b>" + DOW_LONG[dw] + ", " + hh(h) + ":00</b><br>" + fmt(v) + " " + plural(v,"crash","","crashes");
+      html += '<button type="button" data-d="'+dw+'" data-h="'+h+'" aria-pressed="'+on+'" aria-label="'+DOW_LONG[dw]+' '+hh(h)+':00, '+v+'" data-tip="'+esc(tip)+'" style="background:color-mix(in oklab, var(--accent) '+Math.round(t*100)+'%, var(--cell0))"></button>';
+    }
+  }
+  $("week").innerHTML = html;
+  $("dowClear").hidden = S.dow < 0;
+}
+
+// ---------- ranked lists ----------
+function countBy(arr, key){ const m = new Map(); for (const d of arr){ const k = key(d); if (!k) continue; let e = m.get(k); if (!e){ e = {k, n:0, inj:0}; m.set(k, e); } e.n++; if (d.inj > 0) e.inj++; } return [...m.values()].sort((a,b) => b.n - a.n); }
+function barsHTML(items, label, opts){
+  if (!items.length) return '<li class="empty">No crashes match these filters</li>';
+  const max = items[0].n;
+  return items.map(e => {
+    const w = e.n / max * 100, wi = e.inj / max * 100;
+    const track = opts.split ? '<span class="track"><i class="inj" style="width:'+wi.toFixed(2)+'%"></i><i class="pd" style="width:'+(w - wi).toFixed(2)+'%"></i></span>'
+                             : '<span class="track"><i class="one" style="width:'+w.toFixed(2)+'%"></i></span>';
+    const inner = '<span class="nm">'+esc(label(e.k))+'</span><span class="v">'+fmt(e.n)+(opts.split ? '<small>'+fmt(e.inj)+' injury</small>' : "")+'</span>'+track;
+    return opts.clickable ? '<li><button type="button" class="bar" data-street="'+esc(e.k)+'">'+inner+'</button></li>' : '<li><div class="bar">'+inner+'</div></li>';
+  }).join("");
+}
+function renderLists(){
+  const f = S.f;
+  const st = countBy(f, d => d.street).slice(0,10), smax = st.length ? st[0].n : 1;
+  $("streets").innerHTML = st.length ? st.map(e => '<li><button type="button" class="sign" data-street="'+esc(e.k)+'" title="Show '+esc(e.k)+' on the map">'+
+    '<span class="blade" style="width:'+(45 + 55*e.n/smax).toFixed(1)+'%"><span>'+esc(e.k)+'</span><span class="cnt">'+fmt(e.n)+'</span></span>'+
+    '<span class="meta">'+fmt(e.inj)+' with injuries</span></button></li>').join("") : '<li class="empty">No crashes match these filters</li>';
+  const unknown = f.filter(d => NO_CAUSE.has(d.cause)).length;
+  $("causeNote").textContent = f.length ? "Police listed no cause for " + Math.round(unknown / f.length * 100) + "% of crashes. Those are left out below." : "";
+  $("causes").innerHTML = barsHTML(countBy(f.filter(d => !NO_CAUSE.has(d.cause)), d => d.cause).slice(0,8), ruCause, {});
+  $("types").innerHTML = barsHTML(countBy(f, d => d.type).slice(0,8), ruType, {});
+}
+
+// ---------- 500 m area ----------
+function renderArea(){
+  const panel = $("area");
+  if (!S.area){ panel.hidden = true; if (areaCircle){ map.removeLayer(areaCircle); areaCircle = null; } return; }
+  const c = S.area;
+  if (!areaCircle) areaCircle = L.circle(c, { radius:AREA_R, color:tok("--ink"), weight:2, dashArray:"6 6", fillColor:tok("--accent"), fillOpacity:.08, interactive:false }).addTo(map);
+  else areaCircle.setLatLng(c);
+  const inside = S.f.filter(d => c.distanceTo([d.lat, d.lon]) <= AREA_R);
+  panel.hidden = false;
+  $("areaWhere").textContent = "Center " + c.lat.toFixed(4) + ", " + c.lng.toFixed(4) + ". Same filters as the map.";
+  $("aN").textContent = fmt(inside.length);
+  $("aInj").textContent = fmt(inside.reduce((s,d) => s + d.inj, 0));
+  $("aFat").textContent = fmt(inside.reduce((s,d) => s + d.fat, 0));
+  const cityDens = S.f.length / CITY_KM2, dens = inside.length / AREA_KM2;
+  const ratio = cityDens ? dens / cityDens : 0;
+  const rEl = $("aRatio");
+  rEl.textContent = inside.length ? ratio.toLocaleString("en-US",{maximumFractionDigits:1}) + "× the city average" : "no crashes";
+  rEl.style.color = ratio >= 2 ? "var(--fat)" : ratio >= 1 ? "var(--inj)" : "var(--ink)";
+  const top = (arr, key, lab) => { const e = countBy(arr, key)[0]; return e ? lab(e.k) + " (" + fmt(e.n) + ")" : "—"; };
+  $("aCause").textContent = top(inside.filter(d => !NO_CAUSE.has(d.cause)), d => d.cause, ruCause);
+  $("aType").textContent = top(inside, d => d.type, ruType);
+  $("aHour").textContent = top(inside.filter(d => d.hour >= 0), d => String(d.hour), h => hh(+h) + ":00");
+}
+map.on("click", e => {
+  if (Date.now() - layerClickAt < 300) return;
+  S.area = e.latlng; renderArea(); $("hint").hidden = true;
+});
+$("areaClose").addEventListener("click", () => { S.area = null; renderArea(); });
+
+// ---------- controls ----------
+function press(group, btn){ group.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b === btn))); }
+$("daysSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; press(e.currentTarget, b); S.days = +b.dataset.d; load(); });
+for (const id of ["sInj","sFat"]) $(id).addEventListener("click", e => { const s = e.currentTarget.dataset.s; S.sev = S.sev === s ? "all" : s;
+  $("sInj").setAttribute("aria-pressed", String(S.sev === "inj")); $("sFat").setAttribute("aria-pressed", String(S.sev === "fat")); apply(); });
+$("viewSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; press(e.currentTarget, b); S.view = b.dataset.v; renderMap(); });
+$("hours").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; stopPlay(); const h = +b.dataset.h; S.hour = S.hour === h ? -1 : h; apply(); });
+$("week").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; stopPlay(); const dw = +b.dataset.d, h = +b.dataset.h;
+  if (S.dow === dw && S.hour === h){ S.dow = -1; S.hour = -1; } else { S.dow = dw; S.hour = h; } apply(); });
+$("hourClear").addEventListener("click", () => { stopPlay(); S.hour = -1; apply(); });
+$("dowClear").addEventListener("click", () => { S.dow = -1; apply(); });
+$("streets").addEventListener("click", e => { const b = e.target.closest("button[data-street]"); if (!b) return;
+  const pts_ = S.f.filter(d => d.street === b.dataset.street).map(d => [d.lat, d.lon]);
+  if (pts_.length){ map.fitBounds(L.latLngBounds(pts_).pad(0.15), { maxZoom:15 }); document.querySelector(".mapwrap").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block:"center" }); } });
+
+const PLAY = '<svg viewBox="0 0 14 14"><path d="M3 1.5v11l9-5.5z" fill="currentColor"/></svg>';
+const PAUSE = '<svg viewBox="0 0 14 14"><path d="M3 1.5h3v11H3zM8 1.5h3v11H8z" fill="currentColor"/></svg>';
+let timer = null;
+function stopPlay(){ if (timer){ clearInterval(timer); timer = null; } $("play").innerHTML = PLAY; $("play").setAttribute("aria-label","Play through the day"); }
+$("play").innerHTML = PLAY;
+$("play").addEventListener("click", () => {
+  if (timer){ stopPlay(); return; }
+  $("play").innerHTML = PAUSE; $("play").setAttribute("aria-label","Stop");
+  S.hour = S.hour < 0 ? 0 : (S.hour + 1) % 24; apply();
+  timer = setInterval(() => { S.hour = (S.hour + 1) % 24; apply(); }, 800);
+});
+
+// ---------- tooltip ----------
+const tip = $("tip");
+document.addEventListener("pointerover", e => { const t = e.target.closest("[data-tip]"); if (!t){ tip.classList.remove("on"); return; } tip.innerHTML = t.dataset.tip; tip.classList.add("on"); });
+document.addEventListener("pointermove", e => { if (!tip.classList.contains("on")) return;
+  const w = tip.offsetWidth, h = tip.offsetHeight; let x = e.clientX + 14, y = e.clientY - h - 12;
+  if (x + w > innerWidth - 8) x = e.clientX - w - 14; if (y < 8) y = e.clientY + 18;
+  tip.style.left = x + "px"; tip.style.top = y + "px"; });
+document.addEventListener("pointerout", e => { if (!e.relatedTarget || !e.relatedTarget.closest || !e.relatedTarget.closest("[data-tip]")) tip.classList.remove("on"); });
+
+// ---------- theme ----------
+paintStars();
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { paintStars(); if (S.rows.length) renderMap(); });
+
+// ---------- year by year ----------
+async function loadYears(){
+  const R = "https://data.cityofchicago.org/resource/", W = "crash_date >= '2018-01-01T00:00:00'";
+  const q = (id, o) => R + id + ".json?" + Object.entries(o).map(([k,v]) => k + "=" + encodeURIComponent(v)).join("&");
+  try {
+    const [c, p] = await Promise.all([
+      fetch(q("85ca-t3if", {"$select":"date_extract_y(crash_date) as yr, count(*) as n", "$where":W + " AND injuries_total > 0", "$group":"yr"})).then(r => r.json()),
+      fetch(q("u6pd-qa9d", {"$select":"date_extract_y(crash_date) as yr, person_type as pt, injury_classification as ic, count(*) as n",
+        "$where":W + " AND injury_classification IS NOT NULL AND injury_classification != 'NO INDICATION OF INJURY'", "$group":"yr,pt,ic", "$limit":"5000"})).then(r => r.json())
+    ]);
+    const Y = {};
+    const g = y => Y[y] = Y[y] || {c:0, ped:0, cyc:0, k:0};
+    for (const r of c) g(r.yr).c = +r.n;
+    for (const r of p){ const o = g(r.yr), n = +r.n; if (r.pt === "PEDESTRIAN") o.ped += n; if (r.pt === "BICYCLE") o.cyc += n; if (r.ic === "FATAL") o.k += n; }
+    const ys = Object.keys(Y).sort().reverse(), cur = ys[0];
+    $("ytab").innerHTML = ys.map(y => '<tr' + (y === cur ? ' class="cur" title="' + y + ' so far"' : "") + '><td>' + y + (y === cur ? "*" : "") + "</td><td>" + fmt(Y[y].c) + "</td><td>" + fmt(Y[y].ped) +
+      "</td><td>" + fmt(Y[y].cyc) + '</td><td class="k">' + fmt(Y[y].k) + "</td></tr>").join("");
+  } catch (e){ $("ytab").innerHTML = '<tr><td colspan="5" class="empty">Yearly counts did not load.</td></tr>'; }
+}
+loadYears();
+
+load();
+});
+</script>
+</body>
+</html>
